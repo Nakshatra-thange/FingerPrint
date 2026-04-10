@@ -1,0 +1,17 @@
+[package]
+name = "dispute"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "dispute"
+
+[dependencies]
+anchor-lang = "0.32.1"
+
+[features]
+no-entrypoint = []
+test-bpf = []
+idl-build = ["anchor-lang/idl-build"]
+

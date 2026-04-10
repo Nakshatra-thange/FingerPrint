@@ -103,7 +103,123 @@ pub mod escrow{
             EscrowError::InvalidStatus
         );
 
-        
+        let threshold_met_at = escrow.threshold_met_at.ok_or(EscrowError::InvalidStatus)?;
+        let dispute_window_end = threshold_met_at
+             .checked_add(escrow.dispute_window_seconds)
+             .ok_or(EscrowError::Overflow)?;
+
+         require!(
+            clock.unix_timestamp >= dispute_window_end,
+            EscrowError::DisputeWindowActive
+        );
+
+        escrow.status = EscrowStatus::Released;
+
+        let seeds = &[
+            b"vault",
+            &escrow_id.to_le_bytes(),
+            &[ctx.bumps.escrow_vault],
+
+        ]
+
+        let signer = &[&seeds[..]];
+        //imp - allows program to sign on behalf of the PDA --> necessary in anchor
+
+        let cpi_context = CpiContext::new_with_signer(
+            ctx.accounts.system_program.to_account_info(),
+            anchor_lang::system_program::Transfer {
+                from: ctx.accounts.escrow_vault.to_account_info(),
+                to: ctx.accounts.receiver.to_account_info(),
+            },
+            signer,
+        );
+
+        anchor_lang::system_program::transfer(cpi_context, escrow.amount)?;
+        emit!(FundsReleased {
+            escrow_id,
+            receiver: ctx.accounts.receiver.key(),
+            amount: escrow.amount,
+        });
+
+        Ok(())
+
+    }
+
+    pub fn refund(ctx: Context<Refund>, escrow_id: u64) -> Result<()> {
+        let escrow = &mut ctx.accounts.escrow_account;
+        let clock = Clock::get()?;
+ 
+        require!(
+            escrow.status == EscrowStatus::Active,
+            EscrowError::InvalidStatus
+        );
+        require!(
+            clock.unix_timestamp > escrow.deadline,
+            EscrowError::DeadlineNotPassed
+        );
+        require!(
+            ctx.accounts.payer.key() == escrow.payer,
+            EscrowError::Unauthorized
+        );
+
+        escrow.status = EscrowStatus::Refunded;
+
+        let seeds = &[
+            b"vault",
+            &escrow_id.to_le_bytes(),
+            &[ctx.bumps.escrow_vault],
+          ];
+    let signer = &[&seeds[..]];
+    let cpi_context = CpiContext::new_with_signer(
+        ctx.accounts.system_program.to_account_info(),
+        anchor_lang::system_program::Transfer {
+            from: ctx.accounts.escrow_vault.to_account_info(),
+            to: ctx.accounts.payer.to_account_info(),
+        },
+        signer,
+    );
+    anchor_lang::system_program::transfer(cpi_context, escrow.amount)?;
+
+    emit!(FundsRefunded {
+        escrow_id,
+        payer: ctx.accounts.payer.key(),
+        amount: escrow.amount,
+    });
+
+    Ok(())
+}
+    
+    pub fn freeze_for_dispute(ctx: Context<FreezeForDispute>, escrow_id: u64) -> Result<()> {
+    let escrow = &mut ctx.accounts.escrow_account;
+
+    require!(
+        escrow.status == EscrowStatus::ThresholdMet,
+        EscrowError::InvalidStatus
+    );
+    require!(
+        ctx.accounts.dispute_program.key() == crate::DISPUTE_PROGRAM_ID,
+        EscrowError::Unauthorized
+    );
+
+    escrow.status = EscrowStatus::Disputed;
+
+    emit!(EscrowFrozen {
+        escrow_id,
+        timestamp: Clock::get()?.unix_timestamp,
+    });
+
+    Ok(())
+}
+
+
+
+
+
+
+
+
+
+
 
 
     }

@@ -155,6 +155,70 @@ pub enum DisputeStatus {
     ResolvedForPayer,
 }
 
+#[derive(Accounts)]
+#[instruction(escrow_id:u64)]
+pub struct OpenDispute<'info>{
+    #[account(
+        init,
+        payer = disputer,
+        space = DisputeRecord::MAX_SIZE,
+        seeds = [b"dispute", escrow_id.to_le_bytes().as_ref()],
+        bump
+    )]
+
+    pub dispute_record: Account<'info, DisputeRecord>,
+    #[account(mut)]
+    pub escrow_account: Account<'info, escrow::EscrowAccount>,
+ 
+    #[account(mut)]
+    pub disputer: Signer<'info>,
+ 
+    pub escrow_program: Program<'info, Escrow>,
+ 
+    /// CHECK: This program's own ID
+    #[account(address = crate::ID)]
+    pub dispute_self: AccountInfo<'info>,
+ 
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(escrow_id: u64)]
+pub struct ResolveDispute<'info> {
+    #[account(
+        mut,
+        seeds = [b"dispute", escrow_id.to_le_bytes().as_ref()],
+        bump = dispute_record.bump
+    )]
+    pub dispute_record: Account<'info, DisputeRecord>,
+ 
+    /// CHECK: Escrow account
+    #[account(mut)]
+    pub escrow_account: Account<'info, escrow::EscrowAccount>,
+ 
+    /// CHECK: Vault PDA
+    #[account(mut)]
+    pub escrow_vault: AccountInfo<'info>,
+ 
+    /// CHECK: Receiver
+    #[account(mut)]
+    pub receiver: AccountInfo<'info>,
+ 
+    /// CHECK: Payer
+    #[account(mut)]
+    pub payer_account: AccountInfo<'info>,
+ 
+    pub resolver: Signer<'info>,
+ 
+    pub escrow_program: Program<'info, Escrow>,
+ 
+    /// CHECK: This program's own ID
+    #[account(address = crate::ID)]
+    pub dispute_self: AccountInfo<'info>,
+ 
+    pub system_program: Program<'info, System>,
+}
+
 
 
 #[event]

@@ -5,8 +5,6 @@ package_manager = "yarn"
 resolution = true
 skip-lint = false
 
-[programs.localnet]
-fingerprint = "BhKWssfSK7m5yFGELKg86BoH7LmieDi5aEUxDbUiqiiT"
 
 [registry]
 url = "https://api.apr.dev"
@@ -19,3 +17,8 @@ wallet = "~/.config/solana/id.json"
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 \"tests/**/*.ts\""
 
 [hooks]
+
+[programs.localnet]
+escrow = "6MXh43qNLot7M8B7K2W1eshywgZecDRfkLazRKLmQZ5S"
+attestation = "dTydWteGkLkpESKHHW9QeRFD5yBDe3CAjZPVuKrNxCX"
+dispute = "HtcJfyMQodiZZx6D2MwRT8DiwXL7Lgwd9P16HbvpDRc4"

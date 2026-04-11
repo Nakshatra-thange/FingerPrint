@@ -31,7 +31,7 @@ pub mod attestation {
         Ok(())
     }
 
-    pub fn submit_atttestation(
+    pub fn submit_attestation(
         ctx: Context<SubmitAttestation>,
         escrow_id: u64,
         evidence_cid: Option<String>,

@@ -264,8 +264,8 @@ pub fn resolve_dispute(
     Ok(())
 }
 
-pub const ATTESTATION_PROGRAM_ID: Pubkey = pubkey!("AtEs1111111111111111111111111111111111111111");
-pub const DISPUTE_PROGRAM_ID: Pubkey = pubkey!("DiSp1111111111111111111111111111111111111111");
+pub const ATTESTATION_PROGRAM_ID: Pubkey = pubkey!("dTydWteGkLkpESKHHW9QeRFD5yBDe3CAjZPVuKrNxCX");
+pub const DISPUTE_PROGRAM_ID: Pubkey = pubkey!("HtcJfyMQodiZZx6D2MwRT8DiwXL7Lgwd9P16HbvpDRc4");
 
 #[account]
 pub struct EscrowAccount {

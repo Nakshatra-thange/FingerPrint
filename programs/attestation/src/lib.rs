@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use escrow::cpi::accounts::MarkThresholdMet;
 use escrow::program::Escrow;
 
-declare_id!("AtEs1111111111111111111111111111111111111111");
+declare_id!("dTydWteGkLkpESKHHW9QeRFD5yBDe3CAjZPVuKrNxCX");
 
 #[program]
 pub mod attestation {
@@ -18,7 +18,7 @@ pub mod attestation {
         registry.attestation_count = 0;
         registry.bump = ctx.bumps.attestor_registry;
 
-        registry.required_attestors = ctx.accounts.escrow_account.required_attestors.clone()
+        registry.required_attestors = ctx.accounts.escrow_account.required_attestors.clone();
         registry.threshold = ctx.accounts.escrow_account.threshold;
         registry.threshold_reached = false;
 
@@ -158,7 +158,7 @@ pub struct InitRegistry<'info> {
     pub attestor_registry: Account<'info, AttestorRegistry>,
  
     /// CHECK: Read-only escrow account to copy attestors from
-    pub escrow_account: Account<'info, escrow::EscrowAccount>,
+    pub escrow_account: Account<'info, escrow::escrow::EscrowAccount>,
  
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -258,10 +258,3 @@ pub enum AttestationError {
 }
 
  
-
-
- 
-
-
-
-}

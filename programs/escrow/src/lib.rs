@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Token, TokenAccount, Transfer};
-declare_id("EscR1111111111111111111111111111111111111111");
+declare_id!("6MXh43qNLot7M8B7K2W1eshywgZecDRfkLazRKLmQZ5S");
 
 #[program]
 pub mod escrow{
@@ -29,7 +28,7 @@ pub mod escrow{
             EscrowError::DeadlineInPast
         );
 
-        let esrcow = &mut ctx.accounts.escrow_account;
+        let escrow = &mut ctx.accounts.escrow_account;
         escrow.escrow_id= escrow_id;
         escrow.payer = ctx.accounts.payer.key();
         escrow.receiver = ctx.accounts.receiver.key();
@@ -81,7 +80,7 @@ pub mod escrow{
         );
 
         escrow.status = EscrowStatus::ThresholdMet;
-        escorw.threshold_met_at = Some(Clock::get()?.unix_timestamp);
+        escrow.threshold_met_at = Some(Clock::get()?.unix_timestamp);
         emit!(ThresholdMet {
             escrow_id,
             timestamp: Clock::get()?.unix_timestamp,
@@ -115,12 +114,12 @@ pub mod escrow{
 
         escrow.status = EscrowStatus::Released;
 
-        let seeds = &[
+        let seeds = [
             b"vault",
-            &escrow_id.to_le_bytes(),
+            &escrow_id.to_le_bytes()[..],
             &[ctx.bumps.escrow_vault],
 
-        ]
+        ];
 
         let signer = &[&seeds[..]];
         //imp - allows program to sign on behalf of the PDA --> necessary in anchor
@@ -166,7 +165,7 @@ pub mod escrow{
 
         let seeds = &[
             b"vault",
-            &escrow_id.to_le_bytes(),
+            &escrow_id.to_le_bytes()[..],
             &[ctx.bumps.escrow_vault],
           ];
     let signer = &[&seeds[..]];
@@ -228,7 +227,7 @@ pub fn resolve_dispute(
 
     let seeds = &[
         b"vault",
-        &escrow_id.to_le_bytes(),
+        &escrow_id.to_le_bytes()[..],
         &[ctx.bumps.escrow_vault],
     ];
     let signer = &[&seeds[..]];

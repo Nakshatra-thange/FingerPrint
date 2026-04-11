@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
-use escorw::cpi::accounts::{FreezeForDispute, ResolveDispute as EscrowResolveDispute};
-use escorw::program::Escrow;
+use escrow::cpi::accounts::{FreezeForDispute, ResolveDispute as EscrowResolveDispute};
+use escrow::program::Escrow;
 
-declare_id!("DiSp1111111111111111111111111111111111111111");
-pub const RESOLVER: pubkey!("ReSo1111111111111111111111111111111111111111");
+declare_id!("HtcJfyMQodiZZx6D2MwRT8DiwXL7Lgwd9P16HbvpDRc4");
+pub const RESOLVER: Pubkey = pubkey!("ReSo111111111111111111111111111111111111111");
 
 #[program]
 pub mod dispute {
@@ -22,11 +22,11 @@ pub mod dispute {
         }
 
         require!(
-            ctx.accounts.disuter.key()==ctx.accounts.escrow_account.payer,
+            ctx.accounts.disputer.key()==ctx.accounts.escrow_account.payer,
             DisputeError::OnlyPayerCanDispute
         );
 
-        let escorw = &ctx.accounts.escrow_account;
+        let escrow = &ctx.accounts.escrow_account;
         let clock = Clock::get()?;
         let threshold_met_at = escrow.threshold_met_at
             .ok_or(DisputeError::Overflow)?;
@@ -49,11 +49,11 @@ pub mod dispute {
         dispute_record.resolver_notes = None;
         dispute_record.bump = ctx.bumps.dispute_record;
 
-        let cpi_program = ctx.account.escrow_program.to_account_info();
+        let cpi_program = ctx.accounts.escrow_program.to_account_info();
         let cpi_accounts = FreezeForDispute{
             escrow_account: ctx.accounts.escrow_account.to_account_info(),
             dispute_program: ctx.accounts.dispute_self.to_account_info(),
-        }
+        };
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
         escrow::cpi::freeze_for_dispute(cpi_ctx, escrow_id)?;
 
@@ -117,7 +117,7 @@ pub mod dispute {
             resolver_notes,
         });
 
-        Ok(());
+        Ok(())
     }
 
 }
@@ -165,20 +165,19 @@ pub struct OpenDispute<'info>{
         seeds = [b"dispute", escrow_id.to_le_bytes().as_ref()],
         bump
     )]
-
     pub dispute_record: Account<'info, DisputeRecord>,
     #[account(mut)]
-    pub escrow_account: Account<'info, escrow::EscrowAccount>,
- 
+    pub escrow_account: Account<'info, escrow::escrow::EscrowAccount>,
+
     #[account(mut)]
     pub disputer: Signer<'info>,
- 
+
     pub escrow_program: Program<'info, Escrow>,
- 
+
     /// CHECK: This program's own ID
     #[account(address = crate::ID)]
     pub dispute_self: AccountInfo<'info>,
- 
+
     pub system_program: Program<'info, System>,
 }
 
@@ -194,28 +193,28 @@ pub struct ResolveDispute<'info> {
  
     /// CHECK: Escrow account
     #[account(mut)]
-    pub escrow_account: Account<'info, escrow::EscrowAccount>,
- 
+    pub escrow_account: Account<'info, escrow::escrow::EscrowAccount>,
+
     /// CHECK: Vault PDA
     #[account(mut)]
     pub escrow_vault: AccountInfo<'info>,
- 
+
     /// CHECK: Receiver
     #[account(mut)]
     pub receiver: AccountInfo<'info>,
- 
+
     /// CHECK: Payer
     #[account(mut)]
     pub payer_account: AccountInfo<'info>,
- 
+
     pub resolver: Signer<'info>,
- 
+
     pub escrow_program: Program<'info, Escrow>,
- 
+
     /// CHECK: This program's own ID
     #[account(address = crate::ID)]
     pub dispute_self: AccountInfo<'info>,
- 
+
     pub system_program: Program<'info, System>,
 }
 
@@ -265,8 +264,6 @@ pub enum DisputeError {
 
 
         
-
-
 
 
 

@@ -1,5 +1,5 @@
 import { Connection } from "@solana/web3.js";
-import { FingerprintSDK } from "@fingerprint/sdk";
+import { FingerprintSDK } from "@/sdk";
 import {
   upsertEscrow,
   updateEscrowStatus,

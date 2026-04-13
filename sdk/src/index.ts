@@ -1,10 +1,5 @@
 import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
-import {
-  Connection,
-  Keypair,
-  PublicKey,
-  clusterApiUrl,
-} from "@solana/web3.js";
+import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { EscrowClient } from "./escrow-client";
 import { AttestationClient } from "./attestation-client";
 import { DisputeClient } from "./dispute-client";
@@ -39,20 +34,14 @@ export class FingerprintSDK {
     this.provider = new AnchorProvider(config.connection, config.wallet, {
       commitment: "confirmed",
     });
-
     this.escrow = new EscrowClient(this.provider, config.escrowIdl);
     this.attestation = new AttestationClient(this.provider, config.attestationIdl);
     this.dispute = new DisputeClient(this.provider, config.disputeIdl);
   }
 
-  /**
-   * Convenience: create escrow + init registry in two sequential txs.
-   * Returns both pubkeys and signatures.
-   */
   async setupEscrow(params: Parameters<EscrowClient["createEscrow"]>[0]) {
     const result = await this.escrow.createEscrow(params);
     const registryResult = await this.attestation.initRegistry(params.escrowId);
-
     return {
       ...result,
       registryPubkey: registryResult.registryPubkey,
@@ -60,32 +49,18 @@ export class FingerprintSDK {
     };
   }
 
-  /**
-   * Convenience: fetch a complete snapshot of an escrow — account state,
-   * registry state, all attestation records, and any dispute record.
-   */
   async fetchFullState(escrowId: bigint) {
     const escrow = await this.escrow.fetchEscrow(escrowId);
     const registry = await this.attestation.fetchRegistry(escrowId);
     const vaultBalance = await this.escrow.fetchVaultBalance(escrowId);
-
     const attestationMap = await this.attestation.getAttestationStatus(
       escrowId,
       registry.requiredAttestors
     );
-
     const dispute = await this.dispute.fetchDispute(escrowId);
-
-    return {
-      escrow,
-      registry,
-      vaultBalance,
-      attestationMap,
-      dispute,
-    };
+    return { escrow, registry, vaultBalance, attestationMap, dispute };
   }
 
-  // Re-export PDA helpers so consumers don't need to import separately
   static pda = {
     escrow: deriveEscrowPDA,
     vault: deriveVaultPDA,
@@ -101,8 +76,6 @@ export class FingerprintSDK {
   };
 }
 
-// ── Convenience factory for Node.js scripts / backend services ───────────────
-
 export function createSDKFromKeypair(
   keypair: Keypair,
   rpcUrl: string,
@@ -116,13 +89,9 @@ export function createSDKFromKeypair(
       return tx;
     }
     async signAllTransactions(txs: any[]) {
-      return txs.map((tx) => {
-        tx.partialSign(keypair);
-        return tx;
-      });
+      return txs.map((tx) => { tx.partialSign(keypair); return tx; });
     }
   })();
-
   return new FingerprintSDK({
     connection,
     wallet,
@@ -131,8 +100,6 @@ export function createSDKFromKeypair(
     disputeIdl: idls.dispute,
   });
 }
-
-// ── Exports ───────────────────────────────────────────────────────────────────
 
 export { EscrowClient } from "./escrow-client";
 export { AttestationClient } from "./attestation-client";

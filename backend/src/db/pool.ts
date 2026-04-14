@@ -2,19 +2,20 @@ import { Pool } from "pg";
 import dotenv from "dotenv";
 dotenv.config();
 
-export const pool = process.env.DATABASE_URL
-  ? new Pool({
-      connectionString: process.env.DATABASE_URL,
-      max: 10,
-      idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 5_000,
-    })
-  : null;
-
-if (!pool) {
-  console.warn("[db] DATABASE_URL is not set; database features are disabled");
-} else {
-  pool.on("error", (err) => {
-    console.error("Unexpected Postgres client error:", err);
-  });
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL is not set");
 }
+
+export const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 10,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
+  ssl: {
+    rejectUnauthorized: false, // required for Neon
+  },
+});
+
+pool.on("error", (err) => {
+  console.error("Unexpected Postgres client error:", err);
+});

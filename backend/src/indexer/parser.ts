@@ -16,6 +16,7 @@ import {
   ESCROW_PROGRAM_ID,
   ATTESTATION_PROGRAM_ID,
   DISPUTE_PROGRAM_ID,
+  normalizeIdl,
 } from "@fingerprint/sdk";
 
 // ── Helius webhook payload shape ─────────────────────────────────────────────
@@ -58,7 +59,7 @@ export type ParsedEvent =
 interface BaseEvent {
   signature: string;
   slot: number;
-  timestamp: number;
+  blockTime: number;
   programId: string;
 }
 
@@ -155,15 +156,15 @@ export class EventParser {
   ) {
     this.escrowParser = new anchor.EventParser(
       ESCROW_PROGRAM_ID,
-      new anchor.BorshCoder(escrowIdl)
+      new anchor.BorshCoder(normalizeIdl(escrowIdl))
     );
     this.attestationParser = new anchor.EventParser(
       ATTESTATION_PROGRAM_ID,
-      new anchor.BorshCoder(attestationIdl)
+      new anchor.BorshCoder(normalizeIdl(attestationIdl))
     );
     this.disputeParser = new anchor.EventParser(
       DISPUTE_PROGRAM_ID,
-      new anchor.BorshCoder(disputeIdl)
+      new anchor.BorshCoder(normalizeIdl(disputeIdl))
     );
   }
 
@@ -173,24 +174,27 @@ export class EventParser {
    */
   parseTransaction(tx: HeliusTransaction): ParsedEvent[] {
     const events: ParsedEvent[] = [];
-    const meta = { signature: tx.signature, slot: tx.slot, timestamp: tx.timestamp };
+    const meta = { signature: tx.signature, slot: tx.slot, blockTime: tx.timestamp };
 
     // Escrow program events
     for (const event of this.escrowParser.parseLogs(tx.logs)) {
-      events.push(this.mapEscrowEvent(event, meta));
+      const parsed = this.mapEscrowEvent(event, meta);
+      if (parsed) events.push(parsed);
     }
 
     // Attestation program events
     for (const event of this.attestationParser.parseLogs(tx.logs)) {
-      events.push(this.mapAttestationEvent(event, meta));
+      const parsed = this.mapAttestationEvent(event, meta);
+      if (parsed) events.push(parsed);
     }
 
     // Dispute program events
     for (const event of this.disputeParser.parseLogs(tx.logs)) {
-      events.push(this.mapDisputeEvent(event, meta));
+      const parsed = this.mapDisputeEvent(event, meta);
+      if (parsed) events.push(parsed);
     }
 
-    return events.filter(Boolean) as ParsedEvent[];
+    return events;
   }
 
   parseWebhookPayload(payload: HeliusWebhookPayload): ParsedEvent[] {
@@ -201,7 +205,7 @@ export class EventParser {
 
   private mapEscrowEvent(
     event: anchor.Event,
-    meta: { signature: string; slot: number; timestamp: number }
+    meta: { signature: string; slot: number; blockTime: number }
   ): ParsedEvent | null {
     const base = { ...meta, programId: ESCROW_PROGRAM_ID.toBase58() };
 
@@ -267,7 +271,7 @@ export class EventParser {
 
   private mapAttestationEvent(
     event: anchor.Event,
-    meta: { signature: string; slot: number; timestamp: number }
+    meta: { signature: string; slot: number; blockTime: number }
   ): ParsedEvent | null {
     const base = { ...meta, programId: ATTESTATION_PROGRAM_ID.toBase58() };
 
@@ -307,7 +311,7 @@ export class EventParser {
 
   private mapDisputeEvent(
     event: anchor.Event,
-    meta: { signature: string; slot: number; timestamp: number }
+    meta: { signature: string; slot: number; blockTime: number }
   ): ParsedEvent | null {
     const base = { ...meta, programId: DISPUTE_PROGRAM_ID.toBase58() };
 

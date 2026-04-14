@@ -19,6 +19,7 @@ import {
     DISPUTE_PROGRAM_ID,
     ESCROW_PROGRAM_ID,
   } from "./constants";
+  import { normalizeIdl } from "./idl";
   
   export class DisputeClient {
     private program: Program;
@@ -27,7 +28,11 @@ import {
       private provider: AnchorProvider,
       idl: anchor.Idl
     ) {
-      this.program = new Program(idl, DISPUTE_PROGRAM_ID, provider);
+      this.program = new Program(
+        normalizeIdl(idl),
+        DISPUTE_PROGRAM_ID,
+        provider
+      );
     }
   
     // ── Instructions ────────────────────────────────────────────────────────────
@@ -102,13 +107,13 @@ import {
   
     async fetchDispute(escrowId: bigint): Promise<DisputeRecord | null> {
       const [disputePubkey] = deriveDisputePDA(escrowId);
-      try {
-        return (await this.program.account["disputeRecord"].fetch(
-          disputePubkey
-        )) as DisputeRecord;
-      } catch {
-        return null;
-      }
+    try {
+      return (await this.program.account["disputeRecord"].fetch(
+        disputePubkey
+      )) as unknown as DisputeRecord;
+    } catch {
+      return null;
+    }
     }
   
     getDisputePubkey(escrowId: bigint): PublicKey {
@@ -127,7 +132,7 @@ import {
       // Decode using Anchor's coder — program has escrow IDL via CPI dependency
       // In practice the indexer supplies this; here we read direct from chain
       const escrowProgram = new Program(
-        require("../../target/idl/escrow.json"),
+        normalizeIdl(require("../../target/idl/escrow.json")),
         ESCROW_PROGRAM_ID,
         this.provider
       );

@@ -1,4 +1,5 @@
 import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
+import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { EscrowClient } from "./escrow-client";
 import { AttestationClient } from "./attestation-client";
@@ -82,16 +83,7 @@ export function createSDKFromKeypair(
   idls: { escrow: any; attestation: any; dispute: any }
 ): FingerprintSDK {
   const connection = new Connection(rpcUrl, "confirmed");
-  const wallet = new (class implements Wallet {
-    publicKey = keypair.publicKey;
-    async signTransaction(tx: any) {
-      tx.partialSign(keypair);
-      return tx;
-    }
-    async signAllTransactions(txs: any[]) {
-      return txs.map((tx) => { tx.partialSign(keypair); return tx; });
-    }
-  })();
+  const wallet: Wallet = new NodeWallet(keypair);
   return new FingerprintSDK({
     connection,
     wallet,
@@ -107,3 +99,4 @@ export { DisputeClient } from "./dispute-client";
 export * from "./types";
 export * from "./pda";
 export * from "./constants";
+export * from "./idl";

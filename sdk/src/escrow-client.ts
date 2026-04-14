@@ -4,12 +4,13 @@ import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
 import { deriveEscrowPDA, deriveVaultPDA } from "./pda";
 import { CreateEscrowParams, EscrowAccount } from "./types";
 import { ESCROW_PROGRAM_ID, DEFAULT_DISPUTE_WINDOW_SECONDS } from "./constants";
+import { normalizeIdl } from "./idl";
 
 export class EscrowClient {
   private program: Program;
 
   constructor(private provider: AnchorProvider, idl: anchor.Idl) {
-    this.program = new Program(idl, ESCROW_PROGRAM_ID, provider);
+    this.program = new Program(normalizeIdl(idl), ESCROW_PROGRAM_ID, provider);
   }
 
   async createEscrow(params: CreateEscrowParams): Promise<{
@@ -90,7 +91,7 @@ export class EscrowClient {
     const [escrowPubkey] = deriveEscrowPDA(escrowId);
     return this.program.account["escrowAccount"].fetch(
       escrowPubkey
-    ) as Promise<EscrowAccount>;
+    ) as unknown as Promise<EscrowAccount>;
   }
 
   async fetchVaultBalance(escrowId: bigint): Promise<number> {

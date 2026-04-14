@@ -19,10 +19,10 @@
 
 import express, { Request, Response } from "express";
 import cors from "cors";
-import crypto from "crypto";
 import nacl from "tweetnacl";
 import bs58 from "bs58";
 import dotenv from "dotenv";
+import path from "path";
 import { Keypair, Connection } from "@solana/web3.js";
 import { z } from "zod";
 import { createSDKFromKeypair } from "@fingerprint/sdk";
@@ -30,19 +30,16 @@ import { createSDKFromKeypair } from "@fingerprint/sdk";
 dotenv.config();
 
 // ── IDL imports ───────────────────────────────────────────────────────────────
-const escrowIdl = require("../../target/idl/escrow.json");
-const attestationIdl = require("../../target/idl/attestation.json");
-const disputeIdl = require("../../target/idl/dispute.json");
+const idlRoot = path.resolve(__dirname, "../../../fingerprint/target/idl");
+const escrowIdl = require(path.join(idlRoot, "escrow.json"));
+const attestationIdl = require(path.join(idlRoot, "attestation.json"));
+const disputeIdl = require(path.join(idlRoot, "dispute.json"));
 
 // ── Relay keypair (hot wallet that submits txs) ───────────────────────────────
 
-if (!process.env.RELAY_KEYPAIR_BASE58) {
-  throw new Error("RELAY_KEYPAIR_BASE58 is not set");
-}
-
-const relayKeypair = Keypair.fromSecretKey(
-  bs58.decode(process.env.RELAY_KEYPAIR_BASE58)
-);
+const relayKeypair = process.env.RELAY_KEYPAIR_BASE58
+  ? Keypair.fromSecretKey(bs58.decode(process.env.RELAY_KEYPAIR_BASE58))
+  : Keypair.generate();
 
 console.log(`[relay] Hot wallet: ${relayKeypair.publicKey.toBase58()}`);
 
@@ -50,7 +47,7 @@ console.log(`[relay] Hot wallet: ${relayKeypair.publicKey.toBase58()}`);
 
 const sdk = createSDKFromKeypair(
   relayKeypair,
-  process.env.SOLANA_RPC_URL!,
+  process.env.SOLANA_RPC_URL ?? "http://localhost:8899",
   { escrow: escrowIdl, attestation: attestationIdl, dispute: disputeIdl }
 );
 

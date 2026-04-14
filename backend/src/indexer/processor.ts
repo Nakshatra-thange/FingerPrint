@@ -1,5 +1,4 @@
-import { Connection } from "@solana/web3.js";
-import { FingerprintSDK } from "@/sdk";
+import { FingerprintSDK } from "@fingerprint/sdk";
 import {
   upsertEscrow,
   updateEscrowStatus,
@@ -92,7 +91,9 @@ export class EventProcessor {
       payer: event.payer,
       receiver: event.receiver,
       event_description: onChain.eventDescription,
-      required_attestors: onChain.requiredAttestors.map((p) => p.toBase58()),
+      required_attestors: onChain.requiredAttestors.map((p: { toBase58(): string }) =>
+        p.toBase58()
+      ),
       threshold: onChain.threshold,
       amount_lamports: event.amount,
       deadline_unix: event.deadline,
@@ -109,10 +110,6 @@ export class EventProcessor {
     event: AttestationSubmittedEvent
   ): Promise<void> {
     const escrowId = BigInt(event.escrowId);
-    const attestorPubkey = require("@solana/web3.js").PublicKey
-      ? new (require("@solana/web3.js").PublicKey)(event.attestor)
-      : null;
-
     const { PublicKey } = require("@solana/web3.js");
     const { deriveAttestationRecordPDA } = require("@fingerprint/sdk");
     const [recordPubkey] = deriveAttestationRecordPDA(
@@ -125,7 +122,7 @@ export class EventProcessor {
       attestor: event.attestor,
       record_pubkey: recordPubkey.toBase58(),
       evidence_cid: event.evidenceCid,
-      timestamp_unix: event.timestamp.toString(),
+      timestamp_unix: event.blockTime.toString(),
       tx_signature: event.signature,
     });
 
@@ -165,7 +162,7 @@ export class EventProcessor {
       reason: event.reason,
       counter_evidence_cid: event.counterEvidenceCid,
       status: "open",
-      opened_at_unix: event.timestamp.toString(),
+      opened_at_unix: event.blockTime.toString(),
       resolved_at_unix: null,
       resolver_notes: null,
       tx_signature: event.signature,
@@ -189,7 +186,7 @@ export class EventProcessor {
       counter_evidence_cid: null,
       status: finalStatus,
       opened_at_unix: "0",
-      resolved_at_unix: event.timestamp.toString(),
+      resolved_at_unix: event.blockTime.toString(),
       resolver_notes: event.resolverNotes,
       tx_signature: event.signature,
     });

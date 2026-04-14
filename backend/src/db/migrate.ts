@@ -70,6 +70,11 @@ const MIGRATIONS = [
 ];
 
 export async function migrate() {
+  if (!pool) {
+    console.warn("[db] Skipping migrations because DATABASE_URL is not set");
+    return;
+  }
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");

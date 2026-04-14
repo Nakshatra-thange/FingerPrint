@@ -19,6 +19,7 @@ import {
     ATTESTATION_PROGRAM_ID,
     ESCROW_PROGRAM_ID,
   } from "./constants";
+  import { normalizeIdl } from "./idl";
   
   export class AttestationClient {
     private program: Program;
@@ -27,7 +28,11 @@ import {
       private provider: AnchorProvider,
       idl: anchor.Idl
     ) {
-      this.program = new Program(idl, ATTESTATION_PROGRAM_ID, provider);
+      this.program = new Program(
+        normalizeIdl(idl),
+        ATTESTATION_PROGRAM_ID,
+        provider
+      );
     }
   
     // ── Instructions ────────────────────────────────────────────────────────────
@@ -89,12 +94,12 @@ import {
   
     // ── Reads ────────────────────────────────────────────────────────────────────
   
-    async fetchRegistry(escrowId: bigint): Promise<AttestorRegistry> {
-      const [registryPubkey] = deriveRegistryPDA(escrowId);
-      return this.program.account["attestorRegistry"].fetch(
-        registryPubkey
-      ) as Promise<AttestorRegistry>;
-    }
+  async fetchRegistry(escrowId: bigint): Promise<AttestorRegistry> {
+    const [registryPubkey] = deriveRegistryPDA(escrowId);
+    return this.program.account["attestorRegistry"].fetch(
+      registryPubkey
+    ) as unknown as Promise<AttestorRegistry>;
+  }
   
     async fetchAttestationRecord(
       escrowId: bigint,
@@ -104,7 +109,7 @@ import {
       try {
         return (await this.program.account["attestationRecord"].fetch(
           recordPubkey
-        )) as AttestationRecord;
+        )) as unknown as AttestationRecord;
       } catch {
         return null;
       }

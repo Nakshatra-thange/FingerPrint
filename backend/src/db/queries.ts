@@ -1,5 +1,4 @@
 import { pool } from "./pool";
-import { PoolClient } from "pg";
 
 // ── Types matching DB rows ────────────────────────────────────────────────────
 
@@ -54,6 +53,7 @@ export interface DisputeRow {
 export async function upsertEscrow(
   data: Omit<EscrowRow, "id" | "indexed_at" | "last_updated">
 ): Promise<void> {
+  if (!pool) return;
   await pool.query(
     `INSERT INTO escrows (
       escrow_id, escrow_pubkey, vault_pubkey, payer, receiver,
@@ -88,6 +88,7 @@ export async function updateEscrowStatus(
   status: string,
   thresholdMetAt?: string | null
 ): Promise<void> {
+  if (!pool) return;
   await pool.query(
     `UPDATE escrows SET status = $1, threshold_met_at = COALESCE($2, threshold_met_at), last_updated = NOW()
      WHERE escrow_id = $3`,
@@ -96,6 +97,7 @@ export async function updateEscrowStatus(
 }
 
 export async function getEscrowById(escrowId: string): Promise<EscrowRow | null> {
+  if (!pool) return null;
   const { rows } = await pool.query<EscrowRow>(
     "SELECT * FROM escrows WHERE escrow_id = $1",
     [escrowId]
@@ -104,6 +106,7 @@ export async function getEscrowById(escrowId: string): Promise<EscrowRow | null>
 }
 
 export async function getEscrowsByPayer(payer: string): Promise<EscrowRow[]> {
+  if (!pool) return [];
   const { rows } = await pool.query<EscrowRow>(
     "SELECT * FROM escrows WHERE payer = $1 ORDER BY indexed_at DESC",
     [payer]
@@ -112,6 +115,7 @@ export async function getEscrowsByPayer(payer: string): Promise<EscrowRow[]> {
 }
 
 export async function getEscrowsByReceiver(receiver: string): Promise<EscrowRow[]> {
+  if (!pool) return [];
   const { rows } = await pool.query<EscrowRow>(
     "SELECT * FROM escrows WHERE receiver = $1 ORDER BY indexed_at DESC",
     [receiver]
@@ -124,6 +128,7 @@ export async function getAllEscrows(
   limit = 50,
   offset = 0
 ): Promise<EscrowRow[]> {
+  if (!pool) return [];
   const { rows } = status
     ? await pool.query<EscrowRow>(
         "SELECT * FROM escrows WHERE status = $1 ORDER BY indexed_at DESC LIMIT $2 OFFSET $3",
@@ -141,6 +146,7 @@ export async function getAllEscrows(
 export async function insertAttestation(
   data: Omit<AttestationRow, "id" | "indexed_at">
 ): Promise<void> {
+  if (!pool) return;
   await pool.query(
     `INSERT INTO attestations (escrow_id, attestor, record_pubkey, evidence_cid, timestamp_unix, tx_signature)
      VALUES ($1,$2,$3,$4,$5,$6)
@@ -159,6 +165,7 @@ export async function insertAttestation(
 export async function getAttestationsByEscrow(
   escrowId: string
 ): Promise<AttestationRow[]> {
+  if (!pool) return [];
   const { rows } = await pool.query<AttestationRow>(
     "SELECT * FROM attestations WHERE escrow_id = $1 ORDER BY timestamp_unix ASC",
     [escrowId]
@@ -171,6 +178,7 @@ export async function getAttestationsByEscrow(
 export async function upsertDispute(
   data: Omit<DisputeRow, "id" | "indexed_at">
 ): Promise<void> {
+  if (!pool) return;
   await pool.query(
     `INSERT INTO disputes (
        escrow_id, dispute_pubkey, disputer, reason, counter_evidence_cid,
@@ -198,6 +206,7 @@ export async function upsertDispute(
 export async function getDisputeByEscrow(
   escrowId: string
 ): Promise<DisputeRow | null> {
+  if (!pool) return null;
   const { rows } = await pool.query<DisputeRow>(
     "SELECT * FROM disputes WHERE escrow_id = $1",
     [escrowId]
@@ -211,6 +220,7 @@ export async function logWebhookEvent(
   eventType: string,
   payload: unknown
 ): Promise<number> {
+  if (!pool) return 0;
   const { rows } = await pool.query<{ id: number }>(
     "INSERT INTO webhook_events (event_type, payload) VALUES ($1, $2) RETURNING id",
     [eventType, JSON.stringify(payload)]
@@ -222,6 +232,7 @@ export async function markWebhookProcessed(
   id: number,
   error?: string
 ): Promise<void> {
+  if (!pool) return;
   await pool.query(
     "UPDATE webhook_events SET processed = TRUE, error = $1 WHERE id = $2",
     [error ?? null, id]

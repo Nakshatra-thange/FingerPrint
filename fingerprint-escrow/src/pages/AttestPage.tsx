@@ -7,7 +7,7 @@ import { WalletAddress } from "@/components/WalletAddress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ExternalLink } from "lucide-react";
-
+import { useFingerprintSDK } from "@/hooks/useFingerprintSDK";
 function lamportsToSol(l: string) {
   return (Number(l) / 1e9).toFixed(2);
 }
@@ -16,8 +16,34 @@ function lamportsToSol(l: string) {
 const MY_ATTESTOR = "Att1...xY9z";
 
 export default function AttestPage() {
-  const { walletAddress, submitAttestation } = useEscrowStore();
+
   const [cidInputs, setCidInputs] = useState<Record<string, string>>({});
+  const sdk = useFingerprintSDK();
+const { walletAddress, setError } = useEscrowStore();
+const [loading, setLoading] = useState<Record<string, boolean>>({});
+
+// Replace MY_ATTESTOR constant:
+const MY_ATTESTOR = walletAddress ?? "";
+
+const handleAttest = async (escrowId: string) => {
+  if (!sdk || !walletAddress) return;
+  setLoading((p) => ({ ...p, [escrowId]: true }));
+  try {
+    const { PublicKey } = await import("@solana/web3.js");
+    const sig = await sdk.attestation.submitAttestation({
+      escrowId: BigInt(escrowId),
+      attestor: new PublicKey(walletAddress),
+      evidenceCid: cidInputs[escrowId] || undefined,
+    });
+    // Show explorer link via toast or inline
+    console.log("Attested:", sig);
+  } catch (err: any) {
+    const { mapAnchorError } = await import("@/store/escrowStore");
+    setError(mapAnchorError(err));
+  } finally {
+    setLoading((p) => ({ ...p, [escrowId]: false }));
+  }
+};
 
   if (!walletAddress) {
     return (
@@ -61,12 +87,13 @@ export default function AttestPage() {
                     placeholder="Evidence CID (optional)"
                     className="font-mono text-sm"
                   />
-                  <Button
-                    className="w-full"
-                    onClick={() => submitAttestation(e.escrowId, cidInputs[e.escrowId])}
-                  >
-                    Attest
-                  </Button>
+                 <Button
+  className="w-full"
+  disabled={loading[e.escrowId]}
+  onClick={() => handleAttest(e.escrowId)}
+>
+  {loading[e.escrowId] ? "Attesting…" : "Attest"}
+</Button>
                 </div>
               </div>
             ))}

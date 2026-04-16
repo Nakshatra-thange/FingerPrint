@@ -1,10 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { mockEscrows } from "@/data/mockEscrows";
 import { WalletAddress } from "@/components/WalletAddress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import type { EscrowStatus } from "@/types/escrow";
+import { dbRowToSummary } from "@/store/escrowStore";
 
 function lamportsToSol(l: string) {
   return (Number(l) / 1e9).toFixed(2);
@@ -19,6 +20,22 @@ const STATUSES: { value: string; label: string }[] = [
   { value: "released", label: "Released" },
   { value: "refunded", label: "Refunded" },
 ];
+const INDEXER = import.meta.env.VITE_INDEXER_URL ?? "http://localhost:3001";
+const [allEscrows, setAllEscrows] = useState<EscrowSummary[]>([]);
+const [loadingData, setLoadingData] = useState(true);
+
+useEffect(() => {
+  const url = statusFilter === "all"
+    ? `${INDEXER}/api/escrows?limit=100`
+    : `${INDEXER}/api/escrows?status=${statusFilter}&limit=100`;
+
+  setLoadingData(true);
+  fetch(url)
+    .then((r) => r.json())
+    .then(({ escrows }) => setAllEscrows(escrows.map(dbRowToSummary)))  // import from store
+    .catch(() => {})
+    .finally(() => setLoadingData(false));
+}, [statusFilter]);
 
 export default function Explorer() {
   const navigate = useNavigate();

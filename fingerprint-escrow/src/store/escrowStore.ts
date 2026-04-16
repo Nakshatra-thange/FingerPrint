@@ -104,7 +104,7 @@ export const useEscrowStore = create<EscrowStore>((set) => ({
 }));
 
 // Convert Postgres row shape → EscrowSummary used in components
-function dbRowToSummary(row: any): EscrowSummary {
+export function dbRowToSummary(row: any): EscrowSummary {
   return {
     escrowId: row.escrow_id,
     eventDescription: row.event_description,

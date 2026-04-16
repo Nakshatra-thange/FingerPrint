@@ -8,6 +8,12 @@ import { PhantomWalletAdapter,  } from "@solana/wallet-adapter-wallets";
 import { useMemo } from "react";
 import { clusterApiUrl } from "@solana/web3.js";
 
+import { Buffer } from "buffer";
+import process from "process";
+
+(window as any).Buffer = Buffer;
+(window as any).process = process;
+
 const RPC_URL = import.meta.env.VITE_RPC_URL ?? clusterApiUrl("devnet");
 const wallets = [new PhantomWalletAdapter()];
 

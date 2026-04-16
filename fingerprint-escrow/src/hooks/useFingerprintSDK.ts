@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { AnchorProvider } from "@coral-xyz/anchor";
-import { FingerprintSDK } from "../../../sdk/src/index";
+import type { Wallet as AnchorWallet } from "@coral-xyz/anchor/dist/cjs/provider";
+import { FingerprintSDK } from "../../../sdk/src/browser";
 
 // IDLs — generated after anchor build
 import escrowIdl from "../../../fingerprint/target/idl/escrow.json";
@@ -18,10 +18,10 @@ export function useFingerprintSDK(): FingerprintSDK | null {
     }
 
     // Wrap wallet adapter to match Anchor's Wallet interface
-    const anchorWallet = {
+    const anchorWallet: AnchorWallet = {
       publicKey: wallet.publicKey,
-      signTransaction: wallet.signTransaction.bind(wallet),
-      signAllTransactions: wallet.signAllTransactions.bind(wallet),
+      signTransaction: wallet.signTransaction,
+      signAllTransactions: wallet.signAllTransactions,
     };
 
     return new FingerprintSDK({
@@ -31,5 +31,5 @@ export function useFingerprintSDK(): FingerprintSDK | null {
       attestationIdl,
       disputeIdl,
     });
-  }, [wallet.publicKey, connection]);
+  }, [connection, wallet.publicKey, wallet.signAllTransactions, wallet.signTransaction]);
 }

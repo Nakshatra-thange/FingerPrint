@@ -1,322 +1,199 @@
-# Fingerprint
+# FingerPrint
 
-Fingerprint is a multi-party attestation escrow on Solana.
+A trustless escrow protocol on Solana. Lock funds, define who needs to confirm an event happened, and money moves automatically when enough people confirm it. No middlemen. No "call us to release payment." Just math and signatures.
 
-The idea is simple:
+---
 
-- A payer locks money in escrow.
-- The payer defines an event in plain language.
-- The payer chooses a list of attestors and a threshold.
-- Attestors sign when the event really happened.
-- When the threshold is met, the escrow moves into a dispute window.
-- If nobody disputes in time, funds are released automatically.
-- If the deadline passes before the threshold is met, funds return to the payer.
-- If someone disputes, a resolver decides whether the receiver gets paid or the payer gets refunded.
+## The problem it solves
 
-This removes the usual “trust me, I’ll release it later” middle step. The rules live in the protocol.
+Lets say a farmer sells wheat. Payment comes 3 weeks later through a broker who takes a cut and holds the money the whole time. A transporter delivers goods. Payment takes 45 days because someone needs to "process the invoice." A freelancer ships work. Payment is stuck waiting for one person to click approve.
 
-## What we built
+In each case, the money is ready. The trust isn't.
 
-This project has four parts.
+FingerPrint replaces the middleman with a threshold signature check. Lock the money on-chain. Define 5 people who can confirm the event happened. When 3 of them sign, the dispute window opens. If nobody objects in 24 hours, funds release automatically. No one person controls anything.
 
-### 1. On-chain programs
+---
 
-There are three Anchor programs inside `fingerprint/programs`.
+## How it works
 
-- `escrow`
-  It creates the escrow, holds the SOL, releases funds, refunds funds, and tracks status.
+Three Solana programs talk to each other:
 
-- `attestation`
-  It stores the required attestors, records attestations, and marks the escrow as threshold-met when enough attestors have signed.
+**escrow** — holds the money. Knows who paid, who receives, how much, and what the deadline is. Doesn't release anything until the attestation program tells it the threshold is met.
 
-- `dispute`
-  It opens disputes, freezes the escrow while the dispute is active, and resolves the final payout.
+**attestation** — tracks signatures. Each allowed attestor gets one vote. When the count hits the threshold, it CPIs into the escrow program to flip the status. The attestation record PDA also acts as a deduplication guard — if you've already signed, the PDA exists and the transaction fails at the account init constraint. No double voting.
 
-The main escrow statuses are:
+**dispute** — handles the 24-hour window. After threshold is met, anyone can open a dispute with a reason and evidence URI. This CPI's into escrow to mark it disputed. A resolver (currently a multisig key, can be upgraded to a DAO) decides the outcome.
 
-- `active`
-- `thresholdMet`
-- `disputed`
-- `released`
-- `refunded`
+---
 
-### 2. SDK
+## Escrow lifecycle
 
-The SDK is in `sdk/`.
-
-It wraps the program instructions so the frontend and backend do not need to manually build Anchor calls everywhere.
-
-The SDK has:
-
-- `EscrowClient`
-- `AttestationClient`
-- `DisputeClient`
-- `FingerprintSDK`
-
-There is a browser-safe entry for the frontend and a Node entry for backend services.
-
-### 3. Backend
-
-The backend is in `backend/`.
-
-There are two services.
-
-- `indexer`
-  This service receives Helius webhooks, parses Anchor events, stores escrow state in Postgres, exposes REST endpoints for the frontend, uploads evidence to IPFS through Pinata, and runs a worker that auto-releases or auto-refunds escrows.
-
-- `relay`
-  This service is for automated attestors. It verifies signed requests and submits attestation transactions using the relay wallet.
-
-### 4. Frontend
-
-The frontend is in `fingerprint-escrow/`.
-
-It is a Vite + React app with wallet connection and four main flows:
-
-- payer dashboard
-- attestor panel
-- explorer
-- escrow detail page
-
-The dashboard creates real escrows on-chain.
-The attestor panel shows real pending attestations from the indexer.
-The detail page shows live progress, dispute status, and resolver actions.
-
-## How the protocol works
-
-### Happy path
-
-1. The payer creates an escrow.
-2. Funds move into the escrow vault PDA.
-3. The payer also initializes the attestor registry.
-4. Attestors submit attestations.
-5. Once the threshold is met, the escrow moves to `thresholdMet`.
-6. The dispute window starts.
-7. If nobody disputes before the window ends, the backend worker calls release and funds go to the receiver.
-
-### Timeout path
-
-1. The escrow stays `active`.
-2. The deadline passes before enough attestations arrive.
-3. The backend worker calls refund.
-4. Funds go back to the payer.
-
-### Dispute path
-
-1. The threshold is met.
-2. During the dispute window, a dispute can be opened with a reason and optional evidence CID.
-3. The escrow moves to `disputed`.
-4. The resolver wallet decides the result.
-5. Funds go either to the receiver or back to the payer.
-
-## Important design choice
-
-The dispute window is the main trust control in this system.
-
-Without it, funds would release the second the threshold is met.
-That is fast, but it gives no room to challenge a bad attestation.
-
-With a dispute window:
-
-- release is still automatic
-- payout is not left to manual approval
-- the payer still gets a chance to challenge
-
-That is the balance this protocol is trying to strike.
-
-## Folder layout
-
-```text
-FingerPrint/
-├── fingerprint/          # Anchor workspace
-├── sdk/                  # TypeScript SDK
-├── backend/              # Indexer + relay services
-└── fingerprint-escrow/   # Frontend
+```
+Created → Active → ThresholdMet → Released
+                              ↘ Disputed → ResolvedForReceiver
+                                         → ResolvedForPayer (Refunded)
+         → Refunded (deadline passed without threshold)
 ```
 
-## REST API
+Six states. Every transition is either permissionless (anyone can trigger release after window closes) or gated (only the correct program can flip status via CPI).
 
-The indexer exposes the endpoints the frontend uses.
+---
 
-- `GET /api/health`
-- `GET /api/escrows`
-- `GET /api/escrows/by-payer/:address`
-- `GET /api/escrows/by-receiver/:address`
-- `GET /api/escrows/by-attestor/:address`
-- `GET /api/escrows/:escrowId`
-- `POST /api/evidence/upload`
-- `POST /indexer/webhook`
+## Project structure
 
-The relay exposes:
-
-- `GET /relay/health`
-- `GET /relay/attestors`
-- `POST /relay/register`
-- `POST /relay/deactivate`
-- `POST /relay/attest`
-
-## Database tables
-
-The backend migrations create these tables:
-
-- `escrows`
-- `attestations`
-- `disputes`
-- `webhook_events`
-- `relay_attestors`
-
-## Environment variables
-
-### Frontend
-
-Set these in `fingerprint-escrow`.
-
-```bash
-VITE_RPC_URL=
-VITE_INDEXER_URL=
+```
+fingerprint/
+├── programs/
+│   ├── escrow/          — locks funds, manages lifecycle, handles releases
+│   ├── attestation/     — registry + individual attestation records
+│   └── dispute/         — dispute records, resolver logic
+├── sdk/
+│   └── src/
+│       ├── escrow.ts        — build createEscrow / releaseFunds / refund txns
+│       ├── attestation.ts   — build initRegistry / submitAttestation txns
+│       ├── dispute.ts       — build openDispute / resolveDispute txns
+│       ├── pdas.ts          — all PDA derivations in one place
+│       └── types.ts         — TypeScript mirrors of on-chain account structs
+└── tests/
+    └── fingerprint.ts   — integration tests (mocha + chai)
 ```
 
-### Backend
+---
 
-Set these in `backend`.
+## On-chain accounts
+
+| Account | Seeds | Lives in |
+|---|---|---|
+| `EscrowAccount` | `["escrow", payer, nonce]` | escrow program |
+| `vault` (token account) | `["vault", escrow]` | escrow program |
+| `AttestorRegistry` | `["attestor_registry", escrow]` | attestation program |
+| `AttestationRecord` | `["attestation_record", escrow, attestor]` | attestation program |
+| `DisputeRecord` | `["dispute_record", escrow]` | dispute program |
+
+The nonce in the escrow seed lets one payer create multiple escrows without collision.
+
+The `AttestationRecord` PDA is the dedup guard. Trying to attest twice fails at `init` — the PDA already exists, Anchor throws before your instruction logic even runs.
+
+---
+
+## Getting started
+
+**Prerequisites**
+
+- Rust + Cargo
+- Anchor CLI (`cargo install --git https://github.com/coral-xyz/anchor anchor-cli`)
+- Solana CLI + a devnet keypair (`solana-keygen new`)
+- Node.js 18+
+
+**Setup**
 
 ```bash
-SOLANA_RPC_URL=
-DATABASE_URL=
-INDEXER_KEYPAIR_BASE58=
-RELAY_KEYPAIR_BASE58=
-RELAY_ADMIN_TOKEN=
-PINATA_JWT=
-ALLOWED_ORIGINS=
-INDEXER_PORT=3001
-RELAY_PORT=3002
-WORKER_INTERVAL_MS=30000
-```
-
-### Notes
-
-- `PINATA_JWT` is used for evidence uploads.
-- `RELAY_ADMIN_TOKEN` protects attestor registration.
-- `INDEXER_KEYPAIR_BASE58` is the wallet that pays fees for auto-release and auto-refund worker transactions.
-- `RELAY_KEYPAIR_BASE58` is the wallet used by the relay when it submits automated attestations.
-
-## Running the project
-
-### 1. Build the programs
-
-From `fingerprint/`:
-
-```bash
+git clone https://github.com/Nakshatra-thange/FingerPrint
+cd fingerprint
+yarn install
 anchor build
 ```
 
-### 2. Build the SDK
-
-From `sdk/`:
+**Deploy to devnet**
 
 ```bash
-npm run build
+solana config set --url devnet
+solana airdrop 2
+anchor deploy
 ```
 
-### 3. Run backend migrations
+After deploy, copy the three program IDs printed in the terminal and update:
+- `Anchor.toml` — under `[programs.devnet]`
+- `programs/escrow/src/lib.rs` — `declare_id!` + `ATTESTATION_PROGRAM_ID` + `DISPUTE_PROGRAM_ID`
+- `programs/attestation/src/lib.rs` — `declare_id!`
+- `programs/dispute/src/lib.rs` — `declare_id!` + `RESOLVER_PUBKEY`
+- `sdk/src/pdas.ts` — the three `PROGRAM_ID` constants
 
-From `backend/`:
+**Run tests**
 
 ```bash
-npm run db:migrate
+anchor test
 ```
 
-### 4. Start the backend services
+---
 
-From `backend/`:
+## Creating an escrow (SDK)
 
-```bash
-npm run dev:indexer
-npm run dev:relay
+```typescript
+import { EscrowClient } from "./sdk/src";
+import BN from "bn.js";
+
+const client = new EscrowClient(program, connection);
+
+const tx = await client.buildCreateEscrow({
+  payer:            wallet.publicKey,
+  receiver:         receiverPubkey,
+  tokenMint:        USDC_MINT,
+  description:      "Truck TN-07 delivers 200 wheat bags to warehouse W12",
+  allowedAttestors: [att1, att2, att3, att4, att5],
+  threshold:        3,
+  deadlineUnix:     Math.floor(Date.now() / 1000) + 86400 * 7, // 7 days
+  amount:           new BN(5_000_000), // 5 USDC
+  nonce:            new BN(1),
+});
+
+await sendAndConfirm(tx, [wallet]);
 ```
 
-### 5. Start the frontend
+**Attestor signs**
 
-From `fingerprint-escrow/`:
+```typescript
+import { AttestationClient } from "./sdk/src";
 
-```bash
-npm run dev
+const attestClient = new AttestationClient(program);
+
+const tx = await attestClient.buildSubmitAttestation({
+  attestor:    attestorWallet.publicKey,
+  escrow:      escrowPda,
+  evidenceUri: "ipfs://QmYourPhotoOrDocHash",
+});
+
+await sendAndConfirm(tx, [attestorWallet]);
 ```
 
-## Verification commands
+Third signature → escrow flips to `ThresholdMet` automatically via CPI.
 
-These are the main checks used during development:
+---
 
-```bash
-# frontend
-cd fingerprint-escrow
-npx tsc --noEmit -p tsconfig.app.json
-npm run build
+## Trust model
 
-# sdk
-cd ../sdk
-npm run build
+The only trust assumptions in this system:
 
-# backend
-cd ../backend
-npm run build
+1. **Attestors won't all collude.** If all 5 attestors are controlled by the receiver, they can attest falsely. That's why the payer picks the attestors — ideally independent parties (warehouse manager, logistics company, third-party inspector).
 
-# anchor
-cd ../fingerprint
-anchor build
-```
+2. **The resolver is trusted for disputes.** Currently a single multisig key. The upgrade path is a token-weighted DAO vote. This is the weakest point in the system and we know it.
 
-## What is working now
+3. **The oracle problem isn't solved.** This protocol doesn't verify that the evidence URIs contain valid proof. That's a ZK attestation problem for a future version.
 
-- real escrow creation from the dashboard
-- real attestation flow from the attestor panel
-- real dispute open flow
-- resolver UI for dispute resolution
-- indexer-backed explorer and detail pages
-- auto-release worker after dispute window
-- auto-refund worker after deadline
-- evidence upload to IPFS through Pinata
-- persistent relay attestors in Postgres
+Everything else — fund custody, threshold counting, duplicate prevention, state transitions — is enforced by the programs. There's no admin key that can touch the vault.
 
-## Current trust model
+---
 
-This protocol removes the trusted payout middleman.
-It does not remove the problem of dishonest attestors.
+## Upgrade path
 
-If the chosen attestors collude, they can still lie.
-That is the main limitation of this version.
+What's currently a multisig resolver key can be replaced with a DAO program that accepts token-weighted votes. The `RESOLVER_PUBKEY` constant in `dispute/src/lib.rs` is the only thing that needs to change. The dispute program was written with this swap in mind.
 
-What this system does solve is:
+ZK attestations are the longer-term play — instead of a human saying "yes this happened," a zero-knowledge proof attests to a signed document, a GPS coordinate, a sensor reading, without revealing the raw data. Same threshold logic, more trustless data.
 
-- who holds the money while everyone waits
-- when money can move
-- how disputes are handled
-- how the rules are enforced without manual release
+---
 
-## Why this project matters
+## What's live
 
-A lot of real payments get delayed because one side says the job is done, the other side says it is not, and the money sits with a broker, ops team, finance team, or marketplace admin.
+- Three programs on devnet
+- TypeScript SDK for all instructions
+- Integration tests covering the happy path, dedup guard, dispute flow, and refund path
+- Frontend: coming in days 3–4
 
-Fingerprint changes that flow:
+---
 
-- the conditions are defined up front
-- the people who confirm the event are explicit
-- the payout logic is automatic
-- the dispute path is part of the protocol, not an afterthought
+## Built with
 
-That makes it useful for things like:
-
-- freight delivery
-- warehouse confirmations
-- milestone-based contractor payments
-- audits
-- inspections
-- vendor release approvals
-
-## Final note
-
-This is a working protocol demo built to show the full path:
-
-lock funds -> collect attestations -> wait through dispute window -> auto-release or dispute -> final payout
-
-That full path is the point of the project.
+- Rust + Anchor 0.29
+- Solana web3.js + SPL Token
+- TypeScript
+- Helius (indexer, coming day 2)

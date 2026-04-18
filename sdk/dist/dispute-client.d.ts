@@ -4,8 +4,9 @@ import { AnchorProvider } from "@coral-xyz/anchor";
 import { DisputeRecord, OpenDisputeParams, ResolveDisputeParams } from "./types";
 export declare class DisputeClient {
     private provider;
+    private escrowIdl;
     private program;
-    constructor(provider: AnchorProvider, idl: anchor.Idl);
+    constructor(provider: AnchorProvider, idl: anchor.Idl, escrowIdl: anchor.Idl);
     /**
      * Payer opens a dispute within the dispute window.
      * Freezes the escrow — auto-release is blocked until resolved.

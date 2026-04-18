@@ -7,12 +7,12 @@ import { useEffect } from "react";
 
 export function Layout() {
   const { publicKey } = useWallet();
-  const { setWallet } = useEscrowStore();
+  const { error, setError, setSuccess, setWallet, success } = useEscrowStore();
 
   // Keep store in sync with real wallet
   useEffect(() => {
     setWallet(publicKey?.toBase58() ?? null);
-  }, [publicKey]);
+  }, [publicKey, setWallet]);
 
   const navItems = [
     { to: "/dashboard", label: "Dashboard" },
@@ -69,6 +69,34 @@ export function Layout() {
       </nav>
 
       <main className="container py-6">
+        {error && (
+          <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <div className="flex items-center justify-between gap-4">
+              <span>{error}</span>
+              <button
+                className="text-xs underline"
+                onClick={() => setError(null)}
+                type="button"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+        {success && (
+          <div className="mb-4 rounded-md border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-primary">
+            <div className="flex items-center justify-between gap-4">
+              <span>{success}</span>
+              <button
+                className="text-xs underline"
+                onClick={() => setSuccess(null)}
+                type="button"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
         <Outlet />
       </main>
     </div>

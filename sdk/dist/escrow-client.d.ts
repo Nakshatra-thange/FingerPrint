@@ -12,7 +12,7 @@ export declare class EscrowClient {
         vaultPubkey: PublicKey;
     }>;
     releaseFunds(escrowId: bigint, receiver: PublicKey): Promise<TransactionSignature>;
-    refund(escrowId: bigint): Promise<TransactionSignature>;
+    refund(escrowId: bigint, payer: PublicKey): Promise<TransactionSignature>;
     fetchEscrow(escrowId: bigint): Promise<EscrowAccount>;
     fetchVaultBalance(escrowId: bigint): Promise<number>;
     getEscrowPubkey(escrowId: bigint): PublicKey;

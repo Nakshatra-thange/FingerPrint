@@ -40,7 +40,7 @@ class EscrowClient {
         })
             .rpc();
     }
-    async refund(escrowId) {
+    async refund(escrowId, payer) {
         const [escrowPubkey] = (0, pda_1.deriveEscrowPDA)(escrowId);
         const [vaultPubkey] = (0, pda_1.deriveVaultPDA)(escrowId);
         return this.program.methods
@@ -48,7 +48,7 @@ class EscrowClient {
             .accounts({
             escrowAccount: escrowPubkey,
             escrowVault: vaultPubkey,
-            payer: this.provider.wallet.publicKey,
+            payerAccount: payer,
             systemProgram: web3_js_1.SystemProgram.programId,
         })
             .rpc();

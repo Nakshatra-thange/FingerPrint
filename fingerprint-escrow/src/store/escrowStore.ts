@@ -1,50 +1,147 @@
 import { create } from "zustand";
-import type { EscrowSummary, EscrowDetail } from "@/types/escrow";
+import type { DisputeSummary, EscrowDetail, EscrowSummary } from "@/types/escrow";
 
 const INDEXER = import.meta.env.VITE_INDEXER_URL ?? "http://localhost:3001";
 
-// Anchor error code → human message
-export function mapAnchorError(err: any): string {
-  const msg = err?.message ?? String(err);
-  if (msg.includes("DisputeWindowActive")) return "Dispute window still open — check back later.";
-  if (msg.includes("AlreadyAttested")) return "You've already attested to this event.";
-  if (msg.includes("NotAuthorizedAttestor")) return "Your wallet isn't listed as an attestor for this escrow.";
-  if (msg.includes("InvalidStatus")) return "This action isn't valid for the current escrow status.";
-  if (msg.includes("DeadlineNotPassed")) return "The deadline hasn't passed yet.";
-  if (msg.includes("OnlyPayerCanDispute")) return "Only the payer can open a dispute.";
-  return "Transaction failed. Check your wallet and try again.";
+interface EscrowApiRow {
+  escrow_id: string;
+  payer: string;
+  receiver: string;
+  event_description: string;
+  amount_lamports: string;
+  threshold: number;
+  attestation_count?: number;
+  status: string;
+  threshold_met_at: string | null;
+  deadline_unix: string;
+  dispute_window_seconds: string;
+  required_attestors: string[];
+  indexed_at: string;
+  created_at: string;
+}
+
+interface AttestationApiRow {
+  attestor: string;
+  evidence_cid: string | null;
+  timestamp_unix: string;
+  tx_signature: string;
+}
+
+interface DisputeApiRow {
+  disputer: string;
+  reason: string;
+  counter_evidence_cid: string | null;
+  status: string;
+  opened_at_unix: string;
+  resolved_at_unix: string | null;
+  resolver_notes: string | null;
+}
+
+export function mapAnchorError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (message.includes("DisputeWindowActive")) {
+    return "The dispute window is still open.";
+  }
+  if (message.includes("AlreadyAttested")) {
+    return "This wallet already attested on this escrow.";
+  }
+  if (message.includes("NotAuthorizedAttestor")) {
+    return "This wallet is not part of the attestor set.";
+  }
+  if (message.includes("ThresholdAlreadyReached")) {
+    return "The threshold is already met.";
+  }
+  if (message.includes("ThresholdNotMet")) {
+    return "The threshold has not been met yet.";
+  }
+  if (message.includes("DeadlineNotPassed")) {
+    return "The deadline has not passed yet.";
+  }
+  if (message.includes("DisputeWindowClosed")) {
+    return "The dispute window is already closed.";
+  }
+  if (message.includes("DisputeNotOpen")) {
+    return "This dispute is already resolved.";
+  }
+  if (message.includes("NotAuthorizedResolver")) {
+    return "This wallet is not allowed to resolve disputes.";
+  }
+  if (message.includes("InvalidStatus")) {
+    return "This action is not valid in the current escrow state.";
+  }
+
+  return "Transaction failed. Check the wallet popup and try again.";
+}
+
+export function dbRowToSummary(row: EscrowApiRow): EscrowSummary {
+  return {
+    escrowId: row.escrow_id,
+    eventDescription: row.event_description,
+    payer: row.payer,
+    receiver: row.receiver,
+    amountLamports: row.amount_lamports,
+    threshold: row.threshold,
+    attestationCount: row.attestation_count ?? 0,
+    status: row.status as EscrowSummary["status"],
+    thresholdMetAt: row.threshold_met_at,
+    deadlineUnix: row.deadline_unix,
+    disputeWindowSeconds: row.dispute_window_seconds,
+    attestors: row.required_attestors,
+    attestedBy: [],
+    evidenceCids: {},
+    createdAt: row.created_at ?? row.indexed_at,
+  };
+}
+
+function mapDispute(dispute: DisputeApiRow | null): DisputeSummary | null {
+  if (!dispute) return null;
+
+  return {
+    disputer: dispute.disputer,
+    reason: dispute.reason,
+    counterEvidenceCid: dispute.counter_evidence_cid,
+    status: dispute.status,
+    openedAtUnix: dispute.opened_at_unix,
+    resolvedAtUnix: dispute.resolved_at_unix,
+    resolverNotes: dispute.resolver_notes,
+  };
 }
 
 interface EscrowStore {
   escrows: EscrowSummary[];
+  attestorEscrows: EscrowSummary[];
   activeEscrow: EscrowDetail | null;
   walletAddress: string | null;
   isLoading: boolean;
   error: string | null;
-
+  success: string | null;
   setWallet: (address: string | null) => void;
   setEscrows: (escrows: EscrowSummary[]) => void;
   setActiveEscrow: (escrow: EscrowDetail | null) => void;
-  setLoading: (v: boolean) => void;
-  setError: (e: string | null) => void;
-
-  // These need the SDK instance passed in — called from components
+  setLoading: (value: boolean) => void;
+  setError: (message: string | null) => void;
+  setSuccess: (message: string | null) => void;
   fetchEscrowsForWallet: (address: string) => Promise<void>;
+  fetchEscrowsForAttestor: (address: string) => Promise<void>;
   fetchEscrowDetail: (escrowId: string) => Promise<void>;
 }
 
 export const useEscrowStore = create<EscrowStore>((set) => ({
   escrows: [],
+  attestorEscrows: [],
   activeEscrow: null,
   walletAddress: null,
   isLoading: false,
   error: null,
+  success: null,
 
   setWallet: (address) => set({ walletAddress: address }),
   setEscrows: (escrows) => set({ escrows }),
   setActiveEscrow: (escrow) => set({ activeEscrow: escrow }),
-  setLoading: (v) => set({ isLoading: v }),
-  setError: (e) => set({ error: e }),
+  setLoading: (value) => set({ isLoading: value }),
+  setError: (message) => set({ error: message }),
+  setSuccess: (message) => set({ success: message }),
 
   fetchEscrowsForWallet: async (address) => {
     set({ isLoading: true, error: null });
@@ -53,22 +150,43 @@ export const useEscrowStore = create<EscrowStore>((set) => ({
         fetch(`${INDEXER}/api/escrows/by-payer/${address}`),
         fetch(`${INDEXER}/api/escrows/by-receiver/${address}`),
       ]);
-      const [{ escrows: asP }, { escrows: asR }] = await Promise.all([
-        payerRes.json(),
-        receiverRes.json(),
-      ]);
-      // Merge and dedupe by escrow_id
-      const seen = new Set<string>();
-      const merged: EscrowSummary[] = [];
-      for (const e of [...asP, ...asR]) {
-        if (!seen.has(e.escrow_id)) {
-          seen.add(e.escrow_id);
-          merged.push(dbRowToSummary(e));
-        }
+
+      if (!payerRes.ok || !receiverRes.ok) {
+        throw new Error("Failed to load escrows");
       }
-      set({ escrows: merged });
-    } catch (err: any) {
-      set({ error: "Failed to load escrows from indexer." });
+
+      const [{ escrows: payerEscrows }, { escrows: receiverEscrows }] =
+        (await Promise.all([payerRes.json(), receiverRes.json()])) as [
+          { escrows: EscrowApiRow[] },
+          { escrows: EscrowApiRow[] }
+        ];
+
+      const merged = [...payerEscrows, ...receiverEscrows];
+      const unique = new Map<string, EscrowSummary>();
+      for (const row of merged) {
+        unique.set(row.escrow_id, dbRowToSummary(row));
+      }
+
+      set({ escrows: Array.from(unique.values()) });
+    } catch {
+      set({ error: "Failed to load escrows." });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  fetchEscrowsForAttestor: async (address) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch(`${INDEXER}/api/escrows/by-attestor/${address}`);
+      if (!response.ok) {
+        throw new Error("Failed to load attestor escrows");
+      }
+
+      const { escrows } = (await response.json()) as { escrows: EscrowApiRow[] };
+      set({ attestorEscrows: escrows.map(dbRowToSummary) });
+    } catch {
+      set({ error: "Failed to load attestor escrows." });
     } finally {
       set({ isLoading: false });
     }
@@ -77,49 +195,51 @@ export const useEscrowStore = create<EscrowStore>((set) => ({
   fetchEscrowDetail: async (escrowId) => {
     set({ isLoading: true, error: null });
     try {
-      const res = await fetch(`${INDEXER}/api/escrows/${escrowId}`);
-      if (!res.ok) throw new Error("Not found");
-      const { escrow, attestations, dispute } = await res.json();
-      const summary = dbRowToSummary(escrow);
+      const response = await fetch(`${INDEXER}/api/escrows/${escrowId}`);
+      if (!response.ok) {
+        throw new Error("Escrow not found");
+      }
+
+      const payload = (await response.json()) as {
+        escrow: EscrowApiRow;
+        attestations: AttestationApiRow[];
+        dispute: DisputeApiRow | null;
+      };
+
+      const summary = dbRowToSummary(payload.escrow);
+      const attestedBy = payload.attestations.map((attestation) => attestation.attestor);
+      const evidenceCids = Object.fromEntries(
+        payload.attestations
+          .filter((attestation) => Boolean(attestation.evidence_cid))
+          .map((attestation) => [attestation.attestor, attestation.evidence_cid ?? ""])
+      );
+
       const detail: EscrowDetail = {
         ...summary,
-        attestorDetails: escrow.required_attestors.map((addr: string) => {
-          const att = attestations.find((a: any) => a.attestor === addr);
+        attestationCount: payload.attestations.length,
+        attestedBy,
+        evidenceCids,
+        attestorDetails: payload.escrow.required_attestors.map((address) => {
+          const attestation = payload.attestations.find(
+            (candidate) => candidate.attestor === address
+          );
+
           return {
-            address: addr,
-            attested: !!att,
-            evidenceCid: att?.evidence_cid ?? null,
-            attestedAt: att ? new Date(Number(att.timestamp_unix) * 1000).toISOString() : null,
-            txSignature: att?.tx_signature ?? null,
+            address,
+            attested: Boolean(attestation),
+            evidenceCid: attestation?.evidence_cid ?? null,
+            attestedAt: attestation?.timestamp_unix ?? null,
+            txSignature: attestation?.tx_signature ?? null,
           };
         }),
+        dispute: mapDispute(payload.dispute),
       };
+
       set({ activeEscrow: detail });
-    } catch (err: any) {
+    } catch {
       set({ error: "Failed to load escrow detail." });
     } finally {
       set({ isLoading: false });
     }
   },
 }));
-
-// Convert Postgres row shape → EscrowSummary used in components
-export function dbRowToSummary(row: any): EscrowSummary {
-  return {
-    escrowId: row.escrow_id,
-    eventDescription: row.event_description,
-    payer: row.payer,
-    receiver: row.receiver,
-    amountLamports: row.amount_lamports,
-    threshold: row.threshold,
-    attestationCount: 0, // will be filled from attestations separately
-    status: row.status,
-    thresholdMetAt: row.threshold_met_at,
-    deadlineUnix: row.deadline_unix,
-    disputeWindowSeconds: row.dispute_window_seconds,
-    attestors: row.required_attestors,
-    attestedBy: [],
-    evidenceCids: {},
-    createdAt: row.indexed_at,
-  };
-}

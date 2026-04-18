@@ -59,12 +59,22 @@ const MIGRATIONS = [
     error       TEXT,
     received_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`,
+    // ── Relay attestors ───────────────────────────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS relay_attestors (
+    id                 BIGSERIAL PRIMARY KEY,
+    name               TEXT NOT NULL,
+    public_key_base58  TEXT NOT NULL UNIQUE,
+    active             BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
     // ── Indexes ────────────────────────────────────────────────────────────────
     `CREATE INDEX IF NOT EXISTS idx_escrows_payer    ON escrows(payer)`,
     `CREATE INDEX IF NOT EXISTS idx_escrows_receiver ON escrows(receiver)`,
     `CREATE INDEX IF NOT EXISTS idx_escrows_status   ON escrows(status)`,
     `CREATE INDEX IF NOT EXISTS idx_attestations_escrow_id ON attestations(escrow_id)`,
     `CREATE INDEX IF NOT EXISTS idx_attestations_attestor  ON attestations(attestor)`,
+    `CREATE INDEX IF NOT EXISTS idx_relay_attestors_active ON relay_attestors(active)`,
 ];
 async function migrate() {
     if (!pool_1.pool) {

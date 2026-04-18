@@ -156,10 +156,6 @@ pub mod escrow{
             clock.unix_timestamp > escrow.deadline,
             EscrowError::DeadlineNotPassed
         );
-        require!(
-            ctx.accounts.payer.key() == escrow.payer,
-            EscrowError::Unauthorized
-        );
 
         escrow.status = EscrowStatus::Refunded;
 
@@ -173,7 +169,7 @@ pub mod escrow{
         ctx.accounts.system_program.to_account_info(),
         anchor_lang::system_program::Transfer {
             from: ctx.accounts.escrow_vault.to_account_info(),
-            to: ctx.accounts.payer.to_account_info(),
+            to: ctx.accounts.payer_account.to_account_info(),
         },
         signer,
     );
@@ -181,7 +177,7 @@ pub mod escrow{
 
     emit!(FundsRefunded {
         escrow_id,
-        payer: ctx.accounts.payer.key(),
+        payer: ctx.accounts.payer_account.key(),
         amount: escrow.amount,
     });
 
@@ -401,8 +397,13 @@ pub struct Refund<'info> {
     )]
     pub escrow_vault: AccountInfo<'info>,
  
-    #[account(mut)]
-    pub payer: Signer<'info>,
+    /// CHECK: Refunded payer account. Anyone can trigger timeout refund,
+    /// but funds always return to the payer stored in escrow.
+    #[account(
+        mut,
+        constraint = payer_account.key() == escrow_account.payer @ EscrowError::Unauthorized
+    )]
+    pub payer_account: AccountInfo<'info>,
  
     pub system_program: Program<'info, System>,
 }

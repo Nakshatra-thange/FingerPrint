@@ -24,9 +24,10 @@ import {
   export class DisputeClient {
     private program: Program;
   
-    constructor(
+  constructor(
       private provider: AnchorProvider,
-      idl: anchor.Idl
+      idl: anchor.Idl,
+      private escrowIdl: anchor.Idl
     ) {
       this.program = new Program(
         normalizeIdl(idl),
@@ -123,16 +124,13 @@ import {
     // ── Private helpers ──────────────────────────────────────────────────────────
   
     private async fetchEscrowForDispute(escrowId: bigint) {
-      // We need the payer and receiver from the escrow account
-      // Import dynamically to avoid circular dep
-      const { deriveEscrowPDA } = await import("./pda");
       const [escrowPubkey] = deriveEscrowPDA(escrowId);
       const raw = await this.program.provider.connection.getAccountInfo(escrowPubkey);
       if (!raw) throw new Error(`Escrow ${escrowId} not found`);
       // Decode using Anchor's coder — program has escrow IDL via CPI dependency
       // In practice the indexer supplies this; here we read direct from chain
       const escrowProgram = new Program(
-        normalizeIdl(require("../../target/idl/escrow.json")),
+        normalizeIdl(this.escrowIdl),
         ESCROW_PROGRAM_ID,
         this.provider
       );

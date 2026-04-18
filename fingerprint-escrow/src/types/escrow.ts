@@ -1,5 +1,15 @@
 export type EscrowStatus = "active" | "thresholdMet" | "disputed" | "released" | "refunded";
 
+export interface DisputeSummary {
+  disputer: string;
+  reason: string;
+  counterEvidenceCid: string | null;
+  status: string;
+  openedAtUnix: string;
+  resolvedAtUnix: string | null;
+  resolverNotes: string | null;
+}
+
 export interface EscrowSummary {
   escrowId: string;
   eventDescription: string;
@@ -26,4 +36,5 @@ export interface EscrowDetail extends EscrowSummary {
     attestedAt: string | null;
     txSignature: string | null;
   }[];
+  dispute: DisputeSummary | null;
 }

@@ -16,6 +16,10 @@ function lamportsToSol(l: string) {
   return (Number(l) / 1e9).toFixed(2);
 }
 
+function formatUnixSeconds(unix: string) {
+  return new Date(Number(unix) * 1000).toLocaleDateString();
+}
+
 const PAGE_SIZE = 10;
 
 const STATUSES: { value: string; label: string }[] = [
@@ -194,7 +198,7 @@ export default function Explorer() {
                   </td>
 
                   <td className="p-3 text-right text-xs text-muted-foreground hidden md:table-cell">
-                    {new Date(e.createdAt).toLocaleDateString()}
+                    {formatUnixSeconds(e.createdAt)}
                   </td>
                 </tr>
               ))}

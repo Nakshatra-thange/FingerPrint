@@ -21,13 +21,12 @@ pub mod dispute {
             require!(cid.len() <= 64, DisputeError::CidTooLong);
         }
 
-        require!(
-            ctx.accounts.disputer.key()==ctx.accounts.escrow_account.payer,
-            DisputeError::OnlyPayerCanDispute
-        );
-
         let escrow = &ctx.accounts.escrow_account;
         let clock = Clock::get()?;
+        require!(
+            escrow.status == escrow::escrow::EscrowStatus::ThresholdMet,
+            DisputeError::ThresholdNotMet
+        );
         let threshold_met_at = escrow.threshold_met_at
             .ok_or(DisputeError::Overflow)?;
         let dispute_window_end = threshold_met_at
@@ -241,8 +240,6 @@ pub enum DisputeError {
     ReasonTooLong,
     #[msg("Evidence CID must be 64 characters or fewer")]
     CidTooLong,
-    #[msg("Only the payer can open a dispute")]
-    OnlyPayerCanDispute,
     #[msg("Threshold has not been met yet — nothing to dispute")]
     ThresholdNotMet,
     #[msg("The dispute window has already closed")]
@@ -264,7 +261,6 @@ pub enum DisputeError {
 
 
         
-
 
 
 

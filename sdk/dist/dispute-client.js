@@ -1,37 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DisputeClient = void 0;
 const web3_js_1 = require("@solana/web3.js");
@@ -40,8 +7,9 @@ const pda_1 = require("./pda");
 const constants_1 = require("./constants");
 const idl_1 = require("./idl");
 class DisputeClient {
-    constructor(provider, idl) {
+    constructor(provider, idl, escrowIdl) {
         this.provider = provider;
+        this.escrowIdl = escrowIdl;
         this.program = new anchor_1.Program((0, idl_1.normalizeIdl)(idl), constants_1.DISPUTE_PROGRAM_ID, provider);
     }
     // ── Instructions ────────────────────────────────────────────────────────────
@@ -107,16 +75,13 @@ class DisputeClient {
     }
     // ── Private helpers ──────────────────────────────────────────────────────────
     async fetchEscrowForDispute(escrowId) {
-        // We need the payer and receiver from the escrow account
-        // Import dynamically to avoid circular dep
-        const { deriveEscrowPDA } = await Promise.resolve().then(() => __importStar(require("./pda")));
-        const [escrowPubkey] = deriveEscrowPDA(escrowId);
+        const [escrowPubkey] = (0, pda_1.deriveEscrowPDA)(escrowId);
         const raw = await this.program.provider.connection.getAccountInfo(escrowPubkey);
         if (!raw)
             throw new Error(`Escrow ${escrowId} not found`);
         // Decode using Anchor's coder — program has escrow IDL via CPI dependency
         // In practice the indexer supplies this; here we read direct from chain
-        const escrowProgram = new anchor_1.Program((0, idl_1.normalizeIdl)(require("../../target/idl/escrow.json")), constants_1.ESCROW_PROGRAM_ID, this.provider);
+        const escrowProgram = new anchor_1.Program((0, idl_1.normalizeIdl)(this.escrowIdl), constants_1.ESCROW_PROGRAM_ID, this.provider);
         return escrowProgram.account["escrowAccount"].fetch(escrowPubkey);
     }
 }

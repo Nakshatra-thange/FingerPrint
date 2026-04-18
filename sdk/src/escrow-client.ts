@@ -72,7 +72,10 @@ export class EscrowClient {
       .rpc();
   }
 
-  async refund(escrowId: bigint): Promise<TransactionSignature> {
+  async refund(
+    escrowId: bigint,
+    payer: PublicKey
+  ): Promise<TransactionSignature> {
     const [escrowPubkey] = deriveEscrowPDA(escrowId);
     const [vaultPubkey] = deriveVaultPDA(escrowId);
 
@@ -81,7 +84,7 @@ export class EscrowClient {
       .accounts({
         escrowAccount: escrowPubkey,
         escrowVault: vaultPubkey,
-        payer: this.provider.wallet.publicKey,
+        payerAccount: payer,
         systemProgram: SystemProgram.programId,
       })
       .rpc();

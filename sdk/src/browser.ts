@@ -37,7 +37,11 @@ export class FingerprintSDK {
     });
     this.escrow = new EscrowClient(this.provider, config.escrowIdl);
     this.attestation = new AttestationClient(this.provider, config.attestationIdl);
-    this.dispute = new DisputeClient(this.provider, config.disputeIdl);
+    this.dispute = new DisputeClient(
+      this.provider,
+      config.disputeIdl,
+      config.escrowIdl
+    );
   }
 
   async setupEscrow(params: Parameters<EscrowClient["createEscrow"]>[0]) {

@@ -12,6 +12,10 @@ export const DISPUTE_PROGRAM_ID = new PublicKey(
   "HtcJfyMQodiZZx6D2MwRT8DiwXL7Lgwd9P16HbvpDRc4"
 );
 
+export const DISPUTE_RESOLVER = new PublicKey(
+  "ReSo111111111111111111111111111111111111111"
+);
+
 export const DEFAULT_DISPUTE_WINDOW_SECONDS = 24 * 60 * 60;
 
 export const SEEDS = {

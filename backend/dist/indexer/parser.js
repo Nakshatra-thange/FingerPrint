@@ -50,9 +50,9 @@ const sdk_1 = require("@fingerprint/sdk");
 // ── Parser ────────────────────────────────────────────────────────────────────
 class EventParser {
     constructor(escrowIdl, attestationIdl, disputeIdl) {
-        this.escrowParser = new anchor.EventParser(sdk_1.ESCROW_PROGRAM_ID, new anchor.BorshCoder(escrowIdl));
-        this.attestationParser = new anchor.EventParser(sdk_1.ATTESTATION_PROGRAM_ID, new anchor.BorshCoder(attestationIdl));
-        this.disputeParser = new anchor.EventParser(sdk_1.DISPUTE_PROGRAM_ID, new anchor.BorshCoder(disputeIdl));
+        this.escrowParser = new anchor.EventParser(sdk_1.ESCROW_PROGRAM_ID, new anchor.BorshCoder((0, sdk_1.normalizeIdl)(escrowIdl)));
+        this.attestationParser = new anchor.EventParser(sdk_1.ATTESTATION_PROGRAM_ID, new anchor.BorshCoder((0, sdk_1.normalizeIdl)(attestationIdl)));
+        this.disputeParser = new anchor.EventParser(sdk_1.DISPUTE_PROGRAM_ID, new anchor.BorshCoder((0, sdk_1.normalizeIdl)(disputeIdl)));
     }
     /**
      * Parse all events from a Helius transaction payload.
